@@ -2,7 +2,7 @@ backend:
   name: github
   repo: nuovaprolocoluino/menu_online        # <- owner/repo
   branch: main
-  base_url: https://prolocoqr.workers.dev   # <- OAuth proxy (Cloudflare Worker)
+  base_url: https://decap-proxy.prolocoqr.workers.dev   # <- OAuth proxy (Cloudflare Worker)
 
 publish_mode: simple
 locale: it
