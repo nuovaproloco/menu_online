@@ -1,0 +1,33 @@
+backend:
+  name: github
+  repo: mcmatthew/NOME-REPO        # <- owner/repo
+  branch: main
+  base_url: https://decap-oauth.TUO-ACCOUNT.workers.dev   # <- OAuth proxy (Cloudflare Worker)
+
+publish_mode: simple
+locale: it
+
+# Le immagini finiscono in public/uploads/menu. Nel JSON si salva il percorso /uploads/menu/...
+# e la pagina aggiunge da sola il prefisso 'base' di astro.config.mjs: public_folder resta così.
+media_folder: public/uploads/menu
+public_folder: /uploads/menu
+
+collections:
+  - name: menu
+    label: Menù
+    files:
+      - name: menu
+        label: Pagine del menù
+        file: src/data/menu.json
+        format: json
+        fields:
+          - { name: title, label: Titolo, widget: string, default: Menù }
+          - name: pages
+            label: Pagine
+            label_singular: pagina
+            widget: list
+            summary: "{{fields.alt}}"
+            hint: Trascina per riordinare. Per sostituire una pagina, cambia la sua immagine.
+            fields:
+              - { name: image, label: Immagine, widget: image, choose_url: false }
+              - { name: alt, label: Descrizione (facoltativa), widget: string, required: false }

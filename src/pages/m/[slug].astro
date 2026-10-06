@@ -1,0 +1,44 @@
+---
+import Base from '../../layouts/Base.astro';
+import menu from '../../data/menu.json';
+import { MENU_SLUG } from '../../config';
+
+export function getStaticPaths() {
+  return [{ params: { slug: MENU_SLUG } }];
+}
+
+// Cambia a ogni build: evita che i telefoni mostrino immagini vecchie in cache.
+const v = Date.now();
+const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+const pages = (menu.pages ?? []).map((p: { image: string; alt?: string }) => ({
+  src: `${base}/${p.image.replace(/^\/+/, '')}?v=${v}`,
+  alt: p.alt || '',
+}));
+---
+<Base title={menu.title}>
+  <main>
+    {pages.length === 0 && <p class="empty">Il menù non è ancora stato caricato.</p>}
+    {pages.map((p, i) => (
+      <img
+        src={p.src}
+        alt={p.alt || `${menu.title}, pagina ${i + 1}`}
+        loading={i === 0 ? 'eager' : 'lazy'}
+        decoding="async"
+      />
+    ))}
+  </main>
+</Base>
+
+<style>
+  main {
+    max-width: 900px;
+    margin: 0 auto;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding: 12px;
+  }
+  img { display: block; width: 100%; height: auto; border-radius: 4px; }
+  .empty { text-align: center; padding: 4rem 1rem; opacity: 0.7; }
+  @media (min-width: 700px) { main { padding: 24px; gap: 24px; } }
+</style>

@@ -1,0 +1,67 @@
+---
+import Base from '../../layouts/Base.astro';
+import { MENU_SLUG } from '../../config';
+
+export function getStaticPaths() {
+  return [{ params: { slug: MENU_SLUG } }];
+}
+const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+const menuPath = `${base}/m/${MENU_SLUG}/`;
+---
+<Base title="QR del menù">
+  <main>
+    <h1>QR del menù</h1>
+    <div id="qr" aria-live="polite"></div>
+    <p id="target"></p>
+    <button id="download" type="button" disabled>Scarica QR (SVG)</button>
+    <button id="download-png" type="button" disabled>Scarica QR (PNG)</button>
+  </main>
+</Base>
+
+<script define:vars={{ menuPath }}>
+  window.__MENU_PATH__ = menuPath;
+</script>
+<script>
+  import QRCode from 'qrcode';
+
+  const menuPath = (window as any).__MENU_PATH__ as string;
+  const url = new URL(menuPath, window.location.origin).toString();
+  const box = document.getElementById('qr')!;
+  document.getElementById('target')!.textContent = url;
+
+  const opts = { errorCorrectionLevel: 'M' as const, margin: 2, width: 512 };
+  const svgBtn = document.getElementById('download') as HTMLButtonElement;
+  const pngBtn = document.getElementById('download-png') as HTMLButtonElement;
+
+  function save(blob: Blob, name: string) {
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = name;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  }
+
+  Promise.all([QRCode.toString(url, { ...opts, type: 'svg' }), QRCode.toDataURL(url, opts)])
+    .then(([svg, png]) => {
+      box.innerHTML = svg;
+      svgBtn.disabled = pngBtn.disabled = false;
+      svgBtn.onclick = () => save(new Blob([svg], { type: 'image/svg+xml' }), 'menu-qr.svg');
+      pngBtn.onclick = async () => save(await (await fetch(png)).blob(), 'menu-qr.png');
+    })
+    .catch(() => { box.textContent = 'Impossibile generare il QR.'; });
+</script>
+
+<style>
+  main { max-width: 420px; margin: 0 auto; padding: 2rem 1rem; text-align: center; }
+  h1 { font-size: 1.25rem; font-weight: 600; }
+  #qr { background: #fff; padding: 8px; border-radius: 8px; }
+  #qr :global(svg) { width: 100%; height: auto; display: block; }
+  #target { word-break: break-all; font-size: 0.85rem; opacity: 0.7; }
+  button {
+    font: inherit; padding: 0.6rem 1rem; margin: 0.25rem;
+    border: 1px solid currentColor; border-radius: 6px;
+    background: transparent; color: inherit; cursor: pointer;
+  }
+  button:disabled { opacity: 0.4; cursor: default; }
+  button:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; }
+</style>
