@@ -5,7 +5,7 @@ import { defineConfig } from 'astro/config';
 // Con project site su GitHub Pages:
 //   site: 'https://mcmatthew.github.io', base: '/nome-repo'
 export default defineConfig({
-  site: 'https://menu.example.com',
-  base: '/',
+  site: 'https://nuovaproloco.github.io',
+  base: '/menu_online',
   trailingSlash: 'always',
 });
