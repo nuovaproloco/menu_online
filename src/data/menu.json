@@ -4,6 +4,13 @@
     {
       "image": "/uploads/menu/51.png",
       "alt": "Menù di Sabato"
+    },
+    {
+      "image": "/uploads/menu/49.png",
+      "alt": "Menù di domenica"
+    },
+    {
+      "image": "/uploads/menu/50.png"
     }
   ]
 }
