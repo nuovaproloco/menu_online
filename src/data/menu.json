@@ -1,4 +1,9 @@
 {
-  "title": "Menù",
-  "pages": []
+  "title": "Menù LuinoDiVino",
+  "pages": [
+    {
+      "image": "/uploads/menu/51.png",
+      "alt": "Menù di Sabato"
+    }
+  ]
 }
