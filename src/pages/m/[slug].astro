@@ -1,5 +1,6 @@
 ---
 import Base from '../../layouts/Base.astro';
+import MenuViewer from '../../components/MenuViewer.astro';
 import menu from '../../data/menu.json';
 import { MENU_SLUG } from '../../config';
 
@@ -10,35 +11,192 @@ export function getStaticPaths() {
 // Cambia a ogni build: evita che i telefoni mostrino immagini vecchie in cache.
 const v = Date.now();
 const base = import.meta.env.BASE_URL.replace(/\/$/, '');
-const pages = (menu.pages ?? []).map((p: { image: string; alt?: string }) => ({
+const pages = (menu.pages ?? []).map((p: { image: string; alt?: string }, i: number) => ({
   src: `${base}/${p.image.replace(/^\/+/, '')}?v=${v}`,
-  alt: p.alt || '',
+  alt: p.alt || `${menu.title}, pagina ${i + 1}`,
+  caption: p.alt || '',
 }));
 ---
 <Base title={menu.title}>
+  <header class="hero">
+    <h1>{menu.title}</h1>
+    <div class="ornament" aria-hidden="true"><span></span><i></i><span></span></div>
+    {pages.length > 0 && (
+      <p class="hint">
+        <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><circle cx="11" cy="11" r="6.5" /><path d="M16 16l4.5 4.5M11 8.5v5M8.5 11h5" /></svg>
+        Tocca una pagina per ingrandirla
+      </p>
+    )}
+  </header>
+
   <main>
     {pages.length === 0 && <p class="empty">Il menù non è ancora stato caricato.</p>}
-    {pages.map((p, i) => (
-      <img
-        src={p.src}
-        alt={p.alt || `${menu.title}, pagina ${i + 1}`}
-        loading={i === 0 ? 'eager' : 'lazy'}
-        decoding="async"
-      />
-    ))}
+    <ol class="pages">
+      {pages.map((p, i) => (
+        <li>
+          <button
+            class="page"
+            type="button"
+            data-viewer-index={i}
+            data-src={p.src}
+            data-alt={p.alt}
+            data-caption={p.caption}
+            aria-label={`Apri e ingrandisci: ${p.caption || `pagina ${i + 1}`}`}
+          >
+            <img
+              src={p.src}
+              alt={p.alt}
+              loading={i === 0 ? 'eager' : 'lazy'}
+              decoding="async"
+            />
+            <span class="badge" aria-hidden="true">
+              <svg viewBox="0 0 24 24" width="18" height="18"><path d="M14 4h6v6M10 20H4v-6M20 4l-6.5 6.5M4 20l6.5-6.5" /></svg>
+            </span>
+          </button>
+          {pages.length > 1 || p.caption ? (
+            <p class="caption">
+              {pages.length > 1 && <span class="num">{String(i + 1).padStart(2, '0')}</span>}
+              {p.caption && <span>{p.caption}</span>}
+            </p>
+          ) : null}
+        </li>
+      ))}
+    </ol>
   </main>
+
+  <MenuViewer />
 </Base>
 
 <style>
+  .hero {
+    text-align: center;
+    padding: calc(2.5rem + env(safe-area-inset-top)) 16px 1.5rem;
+  }
+  h1 {
+    margin: 0;
+    font-family: var(--serif);
+    font-weight: 500;
+    font-style: italic;
+    font-size: clamp(2rem, 7vw, 3.25rem);
+    line-height: 1.1;
+    letter-spacing: 0.01em;
+    text-wrap: balance;
+  }
+  .ornament {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    margin: 1rem auto 0;
+  }
+  .ornament span {
+    width: 56px;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, var(--gold));
+  }
+  .ornament span:last-child { transform: scaleX(-1); }
+  .ornament i {
+    width: 7px;
+    height: 7px;
+    border: 1px solid var(--gold);
+    transform: rotate(45deg);
+  }
+  .hint {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    margin: 1rem 0 0;
+    font-size: 0.85rem;
+    letter-spacing: 0.02em;
+    color: var(--cream-dim);
+  }
+  .hint svg, .badge svg {
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.8;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
   main {
-    max-width: 900px;
+    max-width: 1040px;
     margin: 0 auto;
+    padding: 0 12px calc(3rem + env(safe-area-inset-bottom));
+  }
+  .pages {
+    list-style: none;
+    margin: 0;
+    padding: 0;
     display: flex;
     flex-direction: column;
-    gap: 12px;
-    padding: 12px;
+    gap: 28px;
   }
-  img { display: block; width: 100%; height: auto; border-radius: 4px; }
-  .empty { text-align: center; padding: 4rem 1rem; opacity: 0.7; }
-  @media (min-width: 700px) { main { padding: 24px; gap: 24px; } }
+  .page {
+    position: relative;
+    display: block;
+    width: 100%;
+    min-height: 120px;
+    padding: 0;
+    border: 1px solid var(--gold-soft);
+    border-radius: 6px;
+    overflow: hidden;
+    background: var(--wine-600);
+    cursor: zoom-in;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 12px 32px -12px rgba(0, 0, 0, 0.6);
+    transition: transform 0.25s ease, box-shadow 0.25s ease, border-color 0.25s ease;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .page img { display: block; width: 100%; height: auto; }
+  .page:active { transform: scale(0.99); }
+  @media (hover: hover) {
+    .page:hover {
+      transform: translateY(-2px);
+      border-color: var(--gold);
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3), 0 20px 40px -14px rgba(0, 0, 0, 0.7);
+    }
+    .page:hover .badge { opacity: 1; }
+  }
+  .badge {
+    position: absolute;
+    right: 10px;
+    bottom: 10px;
+    display: grid;
+    place-items: center;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    color: var(--cream);
+    background: rgba(34, 4, 15, 0.72);
+    border: 1px solid var(--gold-soft);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+    opacity: 0.85;
+    transition: opacity 0.2s ease;
+  }
+  .caption {
+    display: flex;
+    align-items: baseline;
+    justify-content: center;
+    gap: 10px;
+    margin: 12px 0 0;
+    font-family: var(--serif);
+    font-size: 1.05rem;
+    color: var(--cream-dim);
+  }
+  .caption .num {
+    font-size: 0.8rem;
+    letter-spacing: 0.15em;
+    color: var(--gold);
+  }
+  .empty {
+    text-align: center;
+    padding: 3rem 1rem;
+    font-family: var(--serif);
+    font-style: italic;
+    color: var(--cream-dim);
+  }
+  @media (min-width: 700px) {
+    main { padding-left: 24px; padding-right: 24px; }
+    .pages { gap: 44px; }
+  }
 </style>

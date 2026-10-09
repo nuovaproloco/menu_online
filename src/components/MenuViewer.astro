@@ -1,0 +1,621 @@
+---
+// Visualizzatore a schermo intero con zoom.
+// Si apre da qualsiasi elemento con data-viewer-index / data-src / data-alt / data-caption.
+// Gesti: pizzico, doppio tocco, rotella, trascinamento, swipe ←/→ tra le pagine, swipe ↓ per chiudere.
+// Tastiera: ←/→, +/−, 0, Esc.
+---
+<div id="viewer" class="viewer" role="dialog" aria-modal="true" aria-label="Pagina del menù" hidden>
+  <div class="v-stage">
+    <img class="v-img" alt="" draggable="false" />
+  </div>
+
+  <div class="v-bar v-top">
+    <p class="v-title"><span class="v-count"></span><span class="v-caption"></span></p>
+    <button class="v-btn" type="button" data-act="close" aria-label="Chiudi">
+      <svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18" /></svg>
+    </button>
+  </div>
+
+  <button class="v-btn v-nav v-prev" type="button" data-act="prev" aria-label="Pagina precedente">
+    <svg viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7" /></svg>
+  </button>
+  <button class="v-btn v-nav v-next" type="button" data-act="next" aria-label="Pagina successiva">
+    <svg viewBox="0 0 24 24"><path d="M9 5l7 7-7 7" /></svg>
+  </button>
+
+  <div class="v-bar v-bottom">
+    <div class="v-zoom">
+      <button class="v-btn" type="button" data-act="out" aria-label="Riduci">
+        <svg viewBox="0 0 24 24"><path d="M6 12h12" /></svg>
+      </button>
+      <button class="v-level" type="button" data-act="reset" aria-label="Adatta allo schermo">100%</button>
+      <button class="v-btn" type="button" data-act="in" aria-label="Ingrandisci">
+        <svg viewBox="0 0 24 24"><path d="M6 12h12M12 6v12" /></svg>
+      </button>
+    </div>
+  </div>
+
+  <p class="v-tip" aria-hidden="true">Pizzica o tocca due volte per ingrandire</p>
+</div>
+
+<script>
+  type Pt = { x: number; y: number };
+  type Item = { src: string; alt: string; caption: string };
+  type Gesture =
+    | { type: 'pinch'; d: number; m: Pt; s: number; x: number; y: number }
+    | { type: 'drag'; sx: number; sy: number; x: number; y: number; t: number; moved: boolean; axis: 'x' | 'y' | null }
+    | null;
+
+  const root = document.getElementById('viewer') as HTMLDivElement;
+  const triggers = Array.from(document.querySelectorAll<HTMLElement>('[data-viewer-index]'));
+
+  if (root && triggers.length) {
+    const stage = root.querySelector('.v-stage') as HTMLDivElement;
+    const img = root.querySelector('.v-img') as HTMLImageElement;
+    const count = root.querySelector('.v-count') as HTMLSpanElement;
+    const caption = root.querySelector('.v-caption') as HTMLSpanElement;
+    const level = root.querySelector('.v-level') as HTMLButtonElement;
+    const btn = (act: string) => root.querySelector(`[data-act="${act}"]`) as HTMLButtonElement;
+    const [closeBtn, prevBtn, nextBtn, inBtn, outBtn] = ['close', 'prev', 'next', 'in', 'out'].map(btn);
+
+    const items: Item[] = triggers.map((t) => ({
+      src: t.dataset.src || '',
+      alt: t.dataset.alt || '',
+      caption: t.dataset.caption || '',
+    }));
+
+    const ZOOM_STEP = 1.75;
+    const DOUBLE_TAP_ZOOM = 2.5;
+
+    let index = 0;
+    let isOpen = false;
+    let busy = false;
+    let opener: HTMLElement | null = null;
+    // Dimensioni dello stage (W, H) e dell'immagine adattata a scala 1 (bw, bh).
+    let W = 0, H = 0, bw = 0, bh = 0;
+    // Stato della trasformazione: traslazione (x, y) in px e scala s.
+    let s = 1, x = 0, y = 0, maxS = 4;
+
+    // ---------- geometria ----------
+
+    function measure() {
+      const r = stage.getBoundingClientRect();
+      W = r.width;
+      H = r.height;
+      const nw = img.naturalWidth || 2000;
+      const nh = img.naturalHeight || 1414;
+      const k = Math.min(W / nw, H / nh);
+      bw = nw * k;
+      bh = nh * k;
+      img.style.width = `${bw}px`;
+      img.style.height = `${bh}px`;
+      // Permette di arrivare almeno a 1.5× la risoluzione reale, entro limiti ragionevoli.
+      maxS = Math.min(8, Math.max(3, (nw / bw) * 1.5));
+    }
+
+    function bound() {
+      const sw = bw * s, sh = bh * s;
+      x = sw <= W ? (W - sw) / 2 : Math.min(0, Math.max(W - sw, x));
+      y = sh <= H ? (H - sh) / 2 : Math.min(0, Math.max(H - sh, y));
+    }
+
+    function render(animate = false) {
+      img.classList.toggle('anim', animate);
+      img.style.transform = `translate3d(${x}px, ${y}px, 0) scale(${s})`;
+      const zoomed = s > 1.01;
+      root.classList.toggle('zoomed', zoomed);
+      level.textContent = `${Math.round(s * 100)}%`;
+      outBtn.disabled = !zoomed;
+      inBtn.disabled = s >= maxS - 0.01;
+    }
+
+    function zoomTo(ns: number, px: number, py: number, animate = true) {
+      ns = Math.min(maxS, Math.max(1, ns));
+      x = px - ((px - x) * ns) / s;
+      y = py - ((py - y) * ns) / s;
+      s = ns;
+      bound();
+      render(animate);
+    }
+
+    function fit(animate = false) {
+      s = 1;
+      bound();
+      render(animate);
+    }
+
+    function setDim(v: number) {
+      root.style.setProperty('--dim', String(v));
+    }
+
+    // ---------- pagine ----------
+
+    function updateChrome() {
+      const it = items[index];
+      count.textContent = items.length > 1 ? `${index + 1} / ${items.length}` : '';
+      caption.textContent = it.caption;
+      img.alt = it.alt;
+      prevBtn.disabled = index === 0;
+      nextBtn.disabled = index === items.length - 1;
+      root.classList.toggle('single', items.length < 2);
+    }
+
+    function preload(i: number) {
+      if (items[i]) new Image().src = items[i].src;
+    }
+
+    function load(i: number): Promise<void> {
+      index = i;
+      updateChrome();
+      const done = new Promise<void>((resolve) => {
+        img.onload = img.onerror = () => resolve();
+        img.src = items[i].src;
+        if (img.complete && img.naturalWidth) resolve();
+      });
+      preload(i + 1);
+      preload(i - 1);
+      return done.then(() => {
+        img.onload = img.onerror = null;
+        measure();
+      });
+    }
+
+    function go(dir: 1 | -1) {
+      const ni = index + dir;
+      if (busy || ni < 0 || ni >= items.length) {
+        fit(true);
+        return;
+      }
+      busy = true;
+      // Esce dal lato opposto alla direzione, entra dall'altro.
+      s = 1;
+      x = (W - bw) / 2 - dir * W;
+      y = (H - bh) / 2;
+      render(true);
+      setTimeout(() => {
+        load(ni).then(() => {
+          s = 1;
+          x = (W - bw) / 2 + dir * W;
+          y = (H - bh) / 2;
+          render(false);
+          void img.offsetWidth;
+          fit(true);
+          busy = false;
+        });
+      }, 220);
+    }
+
+    // ---------- apertura / chiusura ----------
+
+    function open(i: number, from: HTMLElement) {
+      if (isOpen) return;
+      isOpen = true;
+      opener = from;
+      root.hidden = false;
+      setDim(1);
+      document.documentElement.classList.add('viewer-open');
+      history.pushState({ menuViewer: true }, '');
+      void root.offsetWidth; // fa partire la dissolvenza da opacità 0
+      root.classList.add('is-open', 'loading');
+      load(i).then(() => {
+        fit(false);
+        root.classList.remove('loading');
+      });
+      showTipOnce();
+      closeBtn.focus({ preventScroll: true });
+    }
+
+    function hide() {
+      if (!isOpen) return;
+      isOpen = false;
+      clearTimeout(tapTimer);
+      pts.clear();
+      g = null;
+      root.classList.remove('is-open', 'loading', 'ui-hidden', 'show-tip');
+      document.documentElement.classList.remove('viewer-open');
+      setTimeout(() => {
+        if (!isOpen) root.hidden = true;
+      }, 250);
+      opener?.focus({ preventScroll: true });
+    }
+
+    // Chiudere passa dalla history, così il tasto "indietro" del telefono chiude il visualizzatore.
+    function close() {
+      if (history.state?.menuViewer) history.back();
+      else hide();
+    }
+
+    window.addEventListener('popstate', () => hide());
+
+    function showTipOnce() {
+      let seen = false;
+      try {
+        seen = sessionStorage.getItem('menu-viewer-tip') === '1';
+        sessionStorage.setItem('menu-viewer-tip', '1');
+      } catch {}
+      if (seen) return;
+      root.classList.add('show-tip');
+      setTimeout(() => root.classList.remove('show-tip'), 2800);
+    }
+
+    triggers.forEach((t) => {
+      t.addEventListener('click', () => open(Number(t.dataset.viewerIndex) || 0, t));
+    });
+
+    // ---------- pulsanti e tastiera ----------
+
+    root.addEventListener('click', (e) => {
+      const act = (e.target as HTMLElement).closest<HTMLElement>('[data-act]')?.dataset.act;
+      if (!act) return;
+      if (act === 'close') close();
+      else if (act === 'prev') go(-1);
+      else if (act === 'next') go(1);
+      else if (act === 'in') zoomTo(s * ZOOM_STEP, W / 2, H / 2);
+      else if (act === 'out') zoomTo(s / ZOOM_STEP, W / 2, H / 2);
+      else if (act === 'reset') fit(true);
+    });
+
+    document.addEventListener('keydown', (e) => {
+      if (!isOpen) return;
+      const k = e.key;
+      if (k === 'Escape') close();
+      else if (k === 'ArrowRight' && s <= 1.01) go(1);
+      else if (k === 'ArrowLeft' && s <= 1.01) go(-1);
+      else if (k === '+' || k === '=') zoomTo(s * ZOOM_STEP, W / 2, H / 2);
+      else if (k === '-' || k === '_') zoomTo(s / ZOOM_STEP, W / 2, H / 2);
+      else if (k === '0') fit(true);
+      else if (k === 'Tab') {
+        // Mantiene il focus dentro al visualizzatore.
+        const f = Array.from(root.querySelectorAll<HTMLButtonElement>('button:not(:disabled)'));
+        const i = f.indexOf(document.activeElement as HTMLButtonElement);
+        const next = e.shiftKey ? (i <= 0 ? f.length - 1 : i - 1) : (i + 1) % f.length;
+        f[next]?.focus();
+      } else return;
+      e.preventDefault();
+    });
+
+    window.addEventListener('resize', () => {
+      if (!isOpen) return;
+      measure();
+      fit(false);
+    });
+
+    // ---------- gesti ----------
+
+    const pts = new Map<number, Pt>();
+    let g: Gesture = null;
+    let lastTap = { t: 0, x: 0, y: 0 };
+    let tapTimer = 0;
+
+    const local = (e: PointerEvent | WheelEvent): Pt => {
+      const r = stage.getBoundingClientRect();
+      return { x: e.clientX - r.left, y: e.clientY - r.top };
+    };
+    const dist = (a: Pt, b: Pt) => Math.hypot(a.x - b.x, a.y - b.y);
+    const mid = (a: Pt, b: Pt): Pt => ({ x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 });
+
+    function startGesture() {
+      const p = Array.from(pts.values());
+      if (p.length >= 2) {
+        g = { type: 'pinch', d: dist(p[0], p[1]) || 1, m: mid(p[0], p[1]), s, x, y };
+      } else if (p.length === 1) {
+        g = { type: 'drag', sx: p[0].x, sy: p[0].y, x, y, t: performance.now(), moved: false, axis: null };
+      } else {
+        g = null;
+      }
+    }
+
+    stage.addEventListener('pointerdown', (e) => {
+      if (busy || (e.pointerType === 'mouse' && e.button !== 0)) return;
+      try {
+        stage.setPointerCapture(e.pointerId);
+      } catch {}
+      pts.set(e.pointerId, local(e));
+      startGesture();
+    });
+
+    stage.addEventListener('pointermove', (e) => {
+      if (!pts.has(e.pointerId) || !g) return;
+      const p = local(e);
+      pts.set(e.pointerId, p);
+
+      if (g.type === 'pinch') {
+        const [a, b] = Array.from(pts.values());
+        if (!b) return;
+        const m = mid(a, b);
+        // Sotto 1× c'è un po' di elasticità, poi torna ad adattarsi al rilascio.
+        const ns = Math.min(maxS, Math.max(0.7, (g.s * dist(a, b)) / g.d));
+        x = m.x - ((g.m.x - g.x) * ns) / g.s;
+        y = m.y - ((g.m.y - g.y) * ns) / g.s;
+        s = ns;
+        if (s >= 1) bound();
+        render(false);
+        return;
+      }
+
+      const dx = p.x - g.sx;
+      const dy = p.y - g.sy;
+      if (!g.moved && Math.hypot(dx, dy) < 6) return;
+      g.moved = true;
+
+      if (s > 1.01) {
+        x = g.x + dx;
+        y = g.y + dy;
+        bound();
+        render(false);
+        return;
+      }
+
+      if (!g.axis) g.axis = Math.abs(dx) >= Math.abs(dy) ? 'x' : 'y';
+      if (g.axis === 'x') {
+        const atEdge = (dx > 0 && index === 0) || (dx < 0 && index === items.length - 1);
+        x = g.x + (atEdge ? dx * 0.3 : dx);
+      } else {
+        y = g.y + dy;
+        setDim(1 - Math.min(Math.abs(dy) / (H * 0.6), 0.6));
+      }
+      render(false);
+    });
+
+    function endPointer(e: PointerEvent) {
+      if (!pts.has(e.pointerId)) return;
+      const p = local(e);
+      pts.delete(e.pointerId);
+      const prev = g;
+
+      if (prev?.type === 'pinch') {
+        if (s < 1) fit(true);
+        startGesture();
+        // Il dito rimasto continua a spostare l'immagine, ma non vale come tocco né come swipe di pagina.
+        if (g?.type === 'drag') {
+          if (s > 1.01) g.moved = true;
+          else g = null;
+        }
+        return;
+      }
+
+      if (prev?.type === 'drag') {
+        if (!prev.moved) {
+          handleTap(p);
+        } else if (s <= 1.01) {
+          const dt = Math.max(1, performance.now() - prev.t);
+          if (prev.axis === 'x') {
+            const dx = p.x - prev.sx;
+            if (Math.abs(dx) > W * 0.18 || Math.abs(dx) / dt > 0.5) go(dx < 0 ? 1 : -1);
+            else fit(true);
+          } else if (prev.axis === 'y') {
+            const dy = p.y - prev.sy;
+            if (Math.abs(dy) > H * 0.18 || Math.abs(dy) / dt > 0.6) close();
+            else {
+              setDim(1);
+              fit(true);
+            }
+          }
+        }
+      }
+      startGesture();
+    }
+
+    stage.addEventListener('pointerup', endPointer);
+    stage.addEventListener('pointercancel', endPointer);
+
+    function handleTap(p: Pt) {
+      const now = performance.now();
+      if (now - lastTap.t < 300 && dist(p, lastTap) < 30) {
+        clearTimeout(tapTimer);
+        lastTap.t = 0;
+        if (s > 1.01) fit(true);
+        else zoomTo(Math.min(maxS, DOUBLE_TAP_ZOOM), p.x, p.y);
+      } else {
+        lastTap = { t: now, x: p.x, y: p.y };
+        // Tocco singolo: mostra/nasconde i controlli.
+        tapTimer = window.setTimeout(() => root.classList.toggle('ui-hidden'), 300);
+      }
+    }
+
+    stage.addEventListener(
+      'wheel',
+      (e) => {
+        e.preventDefault();
+        const p = local(e);
+        // ctrlKey = pizzico sul trackpad.
+        const k = e.ctrlKey ? 0.01 : 0.0018;
+        zoomTo(s * Math.exp(-e.deltaY * k), p.x, p.y, false);
+      },
+      { passive: false },
+    );
+
+    // Safari iOS: impedisce lo zoom dell'intera pagina mentre si pizzica l'immagine.
+    root.addEventListener('gesturestart', (e) => e.preventDefault());
+  }
+</script>
+
+<style>
+  :global(html.viewer-open),
+  :global(html.viewer-open body) {
+    overflow: hidden;
+  }
+
+  .viewer {
+    --dim: 1;
+    position: fixed;
+    inset: 0;
+    z-index: 100;
+    color: var(--cream);
+    background: rgba(20, 3, 10, calc(0.97 * var(--dim)));
+    opacity: 0;
+    transition: opacity 0.22s ease;
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .viewer[hidden] { display: none; }
+  .viewer.is-open { opacity: 1; }
+
+  .v-stage {
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
+    touch-action: none;
+    cursor: zoom-in;
+  }
+  .viewer.zoomed .v-stage { cursor: grab; }
+  .viewer.zoomed .v-stage:active { cursor: grabbing; }
+
+  .v-img {
+    position: absolute;
+    top: 0;
+    left: 0;
+    max-width: none;
+    transform-origin: 0 0;
+    will-change: transform;
+    pointer-events: none;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+  }
+  .viewer.loading .v-img { visibility: hidden; }
+  .v-img.anim { transition: transform 0.28s cubic-bezier(0.2, 0.7, 0.2, 1); }
+
+  /* ---------- barre ---------- */
+  .v-bar {
+    position: absolute;
+    left: 0;
+    right: 0;
+    display: flex;
+    align-items: center;
+    padding: 10px max(12px, env(safe-area-inset-left)) 10px max(12px, env(safe-area-inset-right));
+    pointer-events: none;
+    transition: opacity 0.2s ease, transform 0.2s ease;
+  }
+  .v-bar > * { pointer-events: auto; }
+  .v-top {
+    top: 0;
+    justify-content: space-between;
+    gap: 12px;
+    padding-top: max(10px, env(safe-area-inset-top));
+    background: linear-gradient(rgba(20, 3, 10, 0.75), transparent);
+  }
+  .v-bottom {
+    bottom: 0;
+    justify-content: center;
+    padding-bottom: max(14px, env(safe-area-inset-bottom));
+    background: linear-gradient(transparent, rgba(20, 3, 10, 0.75));
+  }
+  .viewer.ui-hidden .v-top { opacity: 0; transform: translateY(-8px); }
+  .viewer.ui-hidden .v-bottom { opacity: 0; transform: translateY(8px); }
+  .viewer.ui-hidden .v-bar > *,
+  .viewer.ui-hidden .v-nav { pointer-events: none; }
+  .viewer.ui-hidden .v-nav { opacity: 0; }
+
+  .v-title {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    min-width: 0;
+    margin: 0;
+    font-family: var(--serif);
+    font-size: 1rem;
+  }
+  .v-count {
+    flex: none;
+    font-size: 0.8rem;
+    letter-spacing: 0.12em;
+    color: var(--gold);
+  }
+  .v-caption {
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+
+  .v-btn {
+    display: grid;
+    place-items: center;
+    flex: none;
+    width: 44px;
+    height: 44px;
+    padding: 0;
+    border: 1px solid var(--gold-soft);
+    border-radius: 50%;
+    background: rgba(34, 4, 15, 0.7);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    cursor: pointer;
+    transition: background 0.15s ease, opacity 0.15s ease, border-color 0.15s ease;
+  }
+  .v-btn svg {
+    width: 20px;
+    height: 20px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.8;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+  .v-btn:disabled { opacity: 0.3; cursor: default; }
+  @media (hover: hover) {
+    .v-btn:not(:disabled):hover { background: var(--wine-600); border-color: var(--gold); }
+  }
+
+  .v-zoom {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px;
+    border: 1px solid var(--gold-soft);
+    border-radius: 999px;
+    background: rgba(34, 4, 15, 0.7);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+  }
+  .v-zoom .v-btn { border: 0; background: transparent; width: 40px; height: 40px; }
+  .v-level {
+    min-width: 64px;
+    height: 40px;
+    padding: 0 6px;
+    border: 0;
+    border-radius: 999px;
+    background: transparent;
+    font-size: 0.85rem;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0.04em;
+    cursor: pointer;
+  }
+
+  .v-nav {
+    position: absolute;
+    top: 50%;
+    margin-top: -22px;
+    transition: opacity 0.2s ease;
+  }
+  .v-prev { left: max(12px, env(safe-area-inset-left)); }
+  .v-next { right: max(12px, env(safe-area-inset-right)); }
+  .viewer.single .v-nav,
+  .viewer.zoomed .v-nav { opacity: 0; pointer-events: none; }
+  /* Sul telefono si scorre con lo swipe: le frecce laterali coprirebbero il menù. */
+  @media (hover: none) and (max-width: 699px) {
+    .v-nav { display: none; }
+  }
+
+  .v-tip {
+    position: absolute;
+    left: 50%;
+    bottom: calc(80px + env(safe-area-inset-bottom));
+    margin: 0;
+    padding: 8px 14px;
+    border-radius: 999px;
+    font-size: 0.85rem;
+    white-space: nowrap;
+    background: rgba(34, 4, 15, 0.85);
+    border: 1px solid var(--gold-soft);
+    transform: translate(-50%, 6px);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s ease, transform 0.3s ease;
+  }
+  .viewer.show-tip .v-tip { opacity: 1; transform: translate(-50%, 0); }
+
+  @media (prefers-reduced-motion: reduce) {
+    .viewer, .v-bar, .v-tip { transition: none; }
+    .v-img.anim { transition-duration: 0.01s; }
+  }
+</style>
