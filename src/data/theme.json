@@ -1,0 +1,18 @@
+{
+  "fonts": {
+    "title": "Playfair Display",
+    "title_italic": true,
+    "body": "Sistema"
+  },
+  "colors": {
+    "background": "#2b0518",
+    "surface": "#4a0a2c",
+    "text": "#f3e9d8",
+    "accent": "#d8b06a"
+  },
+  "background": {
+    "type": "sfumatura",
+    "image": "",
+    "veil": 60
+  }
+}

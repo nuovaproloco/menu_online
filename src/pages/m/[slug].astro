@@ -76,7 +76,7 @@ const pages = (menu.pages ?? []).map((p: { image: string; alt?: string }, i: num
     margin: 0;
     font-family: var(--serif);
     font-weight: 500;
-    font-style: italic;
+    font-style: var(--title-style);
     font-size: clamp(2rem, 7vw, 3.25rem);
     line-height: 1.1;
     letter-spacing: 0.01em;
@@ -92,13 +92,13 @@ const pages = (menu.pages ?? []).map((p: { image: string; alt?: string }, i: num
   .ornament span {
     width: 56px;
     height: 1px;
-    background: linear-gradient(90deg, transparent, var(--gold));
+    background: linear-gradient(90deg, transparent, var(--accent));
   }
   .ornament span:last-child { transform: scaleX(-1); }
   .ornament i {
     width: 7px;
     height: 7px;
-    border: 1px solid var(--gold);
+    border: 1px solid var(--accent);
     transform: rotate(45deg);
   }
   .hint {
@@ -108,7 +108,7 @@ const pages = (menu.pages ?? []).map((p: { image: string; alt?: string }, i: num
     margin: 1rem 0 0;
     font-size: 0.85rem;
     letter-spacing: 0.02em;
-    color: var(--cream-dim);
+    color: var(--text-dim);
   }
   .hint svg, .badge svg {
     fill: none;
@@ -137,10 +137,10 @@ const pages = (menu.pages ?? []).map((p: { image: string; alt?: string }, i: num
     width: 100%;
     min-height: 120px;
     padding: 0;
-    border: 1px solid var(--gold-soft);
+    border: 1px solid var(--accent-soft);
     border-radius: 6px;
     overflow: hidden;
-    background: var(--wine-600);
+    background: var(--surface);
     cursor: zoom-in;
     box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 12px 32px -12px rgba(0, 0, 0, 0.6);
     transition: transform 0.25s ease, box-shadow 0.25s ease, border-color 0.25s ease;
@@ -151,7 +151,7 @@ const pages = (menu.pages ?? []).map((p: { image: string; alt?: string }, i: num
   @media (hover: hover) {
     .page:hover {
       transform: translateY(-2px);
-      border-color: var(--gold);
+      border-color: var(--accent);
       box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3), 0 20px 40px -14px rgba(0, 0, 0, 0.7);
     }
     .page:hover .badge { opacity: 1; }
@@ -165,9 +165,9 @@ const pages = (menu.pages ?? []).map((p: { image: string; alt?: string }, i: num
     width: 36px;
     height: 36px;
     border-radius: 50%;
-    color: var(--cream);
-    background: rgba(34, 4, 15, 0.72);
-    border: 1px solid var(--gold-soft);
+    color: var(--text);
+    background: var(--glass);
+    border: 1px solid var(--accent-soft);
     backdrop-filter: blur(4px);
     -webkit-backdrop-filter: blur(4px);
     opacity: 0.85;
@@ -181,19 +181,19 @@ const pages = (menu.pages ?? []).map((p: { image: string; alt?: string }, i: num
     margin: 12px 0 0;
     font-family: var(--serif);
     font-size: 1.05rem;
-    color: var(--cream-dim);
+    color: var(--text-dim);
   }
   .caption .num {
     font-size: 0.8rem;
     letter-spacing: 0.15em;
-    color: var(--gold);
+    color: var(--accent);
   }
   .empty {
     text-align: center;
     padding: 3rem 1rem;
     font-family: var(--serif);
-    font-style: italic;
-    color: var(--cream-dim);
+    font-style: var(--title-style);
+    color: var(--text-dim);
   }
   @media (min-width: 700px) {
     main { padding-left: 24px; padding-right: 24px; }

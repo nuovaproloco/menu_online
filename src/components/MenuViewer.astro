@@ -441,13 +441,20 @@
     position: fixed;
     inset: 0;
     z-index: 100;
-    color: var(--cream);
-    background: rgba(20, 3, 10, calc(0.97 * var(--dim)));
+    color: var(--text);
     opacity: 0;
     transition: opacity 0.22s ease;
     user-select: none;
     -webkit-user-select: none;
     -webkit-tap-highlight-color: transparent;
+  }
+  /* Fondo su un livello a parte: l'opacità segue --dim durante lo swipe di chiusura. */
+  .viewer::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: var(--shade);
+    opacity: calc(0.97 * var(--dim));
   }
   .viewer[hidden] { display: none; }
   .viewer.is-open { opacity: 1; }
@@ -492,13 +499,13 @@
     justify-content: space-between;
     gap: 12px;
     padding-top: max(10px, env(safe-area-inset-top));
-    background: linear-gradient(rgba(20, 3, 10, 0.75), transparent);
+    background: linear-gradient(color-mix(in srgb, var(--shade) 75%, transparent), transparent);
   }
   .v-bottom {
     bottom: 0;
     justify-content: center;
     padding-bottom: max(14px, env(safe-area-inset-bottom));
-    background: linear-gradient(transparent, rgba(20, 3, 10, 0.75));
+    background: linear-gradient(transparent, color-mix(in srgb, var(--shade) 75%, transparent));
   }
   .viewer.ui-hidden .v-top { opacity: 0; transform: translateY(-8px); }
   .viewer.ui-hidden .v-bottom { opacity: 0; transform: translateY(8px); }
@@ -519,7 +526,7 @@
     flex: none;
     font-size: 0.8rem;
     letter-spacing: 0.12em;
-    color: var(--gold);
+    color: var(--accent);
   }
   .v-caption {
     overflow: hidden;
@@ -534,9 +541,9 @@
     width: 44px;
     height: 44px;
     padding: 0;
-    border: 1px solid var(--gold-soft);
+    border: 1px solid var(--accent-soft);
     border-radius: 50%;
-    background: rgba(34, 4, 15, 0.7);
+    background: var(--glass);
     backdrop-filter: blur(6px);
     -webkit-backdrop-filter: blur(6px);
     cursor: pointer;
@@ -553,7 +560,7 @@
   }
   .v-btn:disabled { opacity: 0.3; cursor: default; }
   @media (hover: hover) {
-    .v-btn:not(:disabled):hover { background: var(--wine-600); border-color: var(--gold); }
+    .v-btn:not(:disabled):hover { background: var(--surface); border-color: var(--accent); }
   }
 
   .v-zoom {
@@ -561,9 +568,9 @@
     align-items: center;
     gap: 4px;
     padding: 4px;
-    border: 1px solid var(--gold-soft);
+    border: 1px solid var(--accent-soft);
     border-radius: 999px;
-    background: rgba(34, 4, 15, 0.7);
+    background: var(--glass);
     backdrop-filter: blur(6px);
     -webkit-backdrop-filter: blur(6px);
   }
@@ -605,8 +612,8 @@
     border-radius: 999px;
     font-size: 0.85rem;
     white-space: nowrap;
-    background: rgba(34, 4, 15, 0.85);
-    border: 1px solid var(--gold-soft);
+    background: color-mix(in srgb, var(--bg-deep) 85%, transparent);
+    border: 1px solid var(--accent-soft);
     transform: translate(-50%, 6px);
     opacity: 0;
     pointer-events: none;

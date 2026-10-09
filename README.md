@@ -22,6 +22,10 @@ Sito statico con un menù a più pagine (immagini), visibile solo da QR (noindex
 `/admin/` > Menù > Pagine del menù: aggiungi, riordina o sostituisci le immagini > Publish.
 Dopo 1-2 minuti la Action ricostruisce il sito e il menù è aggiornato (il QR non cambia).
 
+`/admin/` > Aspetto > Font, colori e sfondo: font di titoli e testo, i quattro colori e il tipo di sfondo
+(sfumatura, tinta unita o immagine con velatura). I dati stanno in `src/data/theme.json`, la logica in
+`src/theme.ts` (per aggiungere un font va messo sia lì in `FONTS` sia nelle opzioni di `public/admin/config.yml`).
+
 ## Immagini
 WebP o JPG, larghezza max ~1600px, sotto ~400 KB l'una: finiscono nella history di git.
 

@@ -31,3 +31,87 @@ collections:
             fields:
               - { name: image, label: Immagine, widget: image, choose_url: false }
               - { name: alt, label: Descrizione (facoltativa), widget: string, required: false }
+
+  - name: aspetto
+    label: Aspetto
+    files:
+      - name: theme
+        label: Font, colori e sfondo
+        file: src/data/theme.json
+        format: json
+        fields:
+          - name: fonts
+            label: Font
+            widget: object
+            collapsed: false
+            fields:
+              # Elenco allineato con FONTS in src/theme.ts
+              - name: title
+                label: Font dei titoli
+                widget: select
+                default: Playfair Display
+                options:
+                  - Playfair Display
+                  - Cormorant Garamond
+                  - EB Garamond
+                  - Lora
+                  - Fraunces
+                  - Crimson Pro
+                  - Cinzel
+                  - Montserrat
+                  - Raleway
+                  - Josefin Sans
+                  - Poppins
+                  - Nunito
+                  - Oswald
+                  - Dancing Script
+              - name: title_italic
+                label: Titoli in corsivo
+                widget: boolean
+                default: true
+                hint: Ignorato per Cinzel, Oswald e Dancing Script, che non hanno il corsivo.
+              - name: body
+                label: Font del testo
+                widget: select
+                default: Sistema
+                hint: "Sistema = il font del telefono, il più leggibile e veloce."
+                options:
+                  - Sistema
+                  - Playfair Display
+                  - Cormorant Garamond
+                  - EB Garamond
+                  - Lora
+                  - Fraunces
+                  - Crimson Pro
+                  - Cinzel
+                  - Montserrat
+                  - Raleway
+                  - Josefin Sans
+                  - Poppins
+                  - Nunito
+                  - Oswald
+                  - Dancing Script
+          - name: colors
+            label: Colori
+            widget: object
+            collapsed: false
+            fields:
+              - { name: background, label: Sfondo, widget: color, allowInput: true, default: '#2b0518' }
+              - { name: surface, label: Sfumatura e riquadri, widget: color, allowInput: true, default: '#4a0a2c', hint: Colore della sfumatura in alto e del fondo delle pagine mentre caricano. }
+              - { name: text, label: Testo, widget: color, allowInput: true, default: '#f3e9d8' }
+              - { name: accent, label: Dettagli, widget: color, allowInput: true, default: '#d8b06a', hint: Ornamenti, numeri di pagina e bordi. }
+          - name: background
+            label: Sfondo
+            widget: object
+            collapsed: false
+            fields:
+              - name: type
+                label: Tipo di sfondo
+                widget: select
+                default: sfumatura
+                options:
+                  - { label: Sfumatura, value: sfumatura }
+                  - { label: Tinta unita, value: tinta }
+                  - { label: Immagine, value: immagine }
+              - { name: image, label: Immagine di sfondo, widget: image, choose_url: false, required: false, hint: "Usata solo con tipo «Immagine». JPG o WebP, max ~1600px." }
+              - { name: veil, label: Velatura (%), widget: number, value_type: int, min: 0, max: 95, default: 60, hint: "Copre l'immagine con il colore di sfondo per rendere leggibile il testo. 0 = immagine pura." }
